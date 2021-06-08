@@ -1,3 +1,4 @@
+
 def get_component(tag_subtree, selector, attribute=None, return_list=False):
     try:
         if attribute:

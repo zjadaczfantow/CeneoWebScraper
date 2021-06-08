@@ -8,11 +8,18 @@ class Product:
     def __init__(self, product_id, product_name=None, opinions=[], opinions_count=None, pros_count=None, cons_count=None, average_score=None):
         self.product_id = product_id
         self.product_name = product_name
-        self.opinions = opinions
+        self.opinions = opinions.copy()
         self.opinions_count = opinions_count
         self.pros_count = pros_count
         self.cons_count = cons_count
         self.average_score = average_score
+
+    def extract_name(self):
+        respons = requests.get(
+            f"https://www.ceneo.pl/{self.product_id}#tab=reviews")
+        if respons.status_code == 200:
+            page_dom = BeautifulSoup(respons.text, 'html.parser')
+            self.product_name = get_component(page_dom, "h1.js_product-h1-link")
 
     def extract_opinions(self):
         page = 1
@@ -56,6 +63,19 @@ class Product:
     def export_to_json(self):
         with open(f"app/products/{self.product_id}.json", "w", encoding="UTF-8") as jf:
             json.dump(self.to_dict(), jf, ensure_ascii=False, indent=4)
+
+    def import_from_json(self):
+        with open(f"app/products/{self.product_id}.json", "r", encoding="UTF-8") as jf:
+            product = json.load(jf)
+        self.product_id = product['product_id']
+        self.product_name = product['product_name']
+        self.opinions_count = product['opinions_count']
+        self.pros_count = product['pros_count']
+        self.cons_count = product['cons_count']
+        self.average_score = product['average_score']
+        opinions = product['opinions']
+        for opinion in opinions:
+            self.opinions.append(Opinion(**opinion))
     
     def analyze(self):
         self.opinions_count = len(self.opinions)
@@ -77,7 +97,7 @@ class Opinion:
         "cons": ["div.review-feature__col:has(> div[class$=\"negatives\"]) > div.review-feature__item",
                  None,
                  True],
-        "verfied": ["div.review-pz"],
+        "verified": ["div.review-pz"],
         "post_date": ["span.user-post__published > time:nth-child(1)", "datetime"],
         "purchase_date": ["span.user-post__published > time:nth-child(2)", "datetime"],
         "usefulness": ["span[id^='votes-yes']"],
@@ -86,6 +106,17 @@ class Opinion:
 
     def __init__(self, opinion_id=None, author=None, recommendation=None, stars=None, content=None, pros=None, cons=None, verified=None, post_date=None, purchase_date=None, usefulness=None, uselessness=None) -> None:
         self.opinion_id = opinion_id
+        self.author = author
+        self.recommendation = recommendation
+        self.stars = stars
+        self.content = content
+        self.pros = pros
+        self.cons = cons
+        self.verified = verified
+        self.post_date = post_date
+        self.purchase_date = purchase_date
+        self.usefulness = usefulness
+        self.uselessness = uselessness
 
     def extract_components(self, opinion):
         for key, value in self.selectors.items():
@@ -97,7 +128,7 @@ class Opinion:
         self.recommendation = True if self.recommendation == "Polecam" else False if self.recommendation == "Nie polecam" else None
         self.stars = float(self.stars.split("/")[0].replace(",", "."))
         self.content = re.sub("\\s", " ", self.content)
-        self.verfied = bool(self.verfied)
+        self.verified = bool(self.verified)
         self.usefulness=int(self.usefulness)
         self.uselessness = int(self.uselessness)
         return self
